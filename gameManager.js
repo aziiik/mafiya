@@ -1,5 +1,5 @@
 const { InlineKeyboard } = require("grammy");
-const { Game, STATE, ROLE, ROLE_EMOJI } = require("./game");
+const { Game, STATE, ROLE, ROLE_EMOJI, ROLE_IMAGES } = require("./game");
 
 class GameManager {
   constructor(bot, adminManager) {
@@ -36,6 +36,14 @@ class GameManager {
     try {
       await this.bot.api.sendMessage(player.chatId, text, extra);
     } catch (e) { console.error(`Send error ${player.name}:`, e.message); }
+  }
+
+  async sendPhotoToPlayer(player, photoUrl, caption) {
+    try {
+      await this.bot.api.sendPhoto(player.chatId, photoUrl, { caption });
+    } catch (e) {
+      await this.sendToPlayer(player, caption);
+    }
   }
 
   async createGame(ctx) {
@@ -174,6 +182,8 @@ class GameManager {
       await this.handleDayVote(ctx, data);
     } else if (data.startsWith("tievote_")) {
       await this.handleTieVote(ctx, data);
+    } else if (data.startsWith("rematch_")) {
+      await this.handleRematch(ctx, data);
     }
   }
 
@@ -227,22 +237,25 @@ class GameManager {
     try { await ctx.deleteMessage(); } catch (e) {}
 
     for (const player of game.players.values()) {
-      let msg = `🎭 OYIN BOSHLANDI!\n━━━━━━━━━━━━━━━\nSizning rolingiz:\n\n`;
+      let caption = `🎭 OYIN BOSHLANDI!\n━━━━━━━━━━━━━━━\nSizning rolingiz:\n\n`;
+      let photoUrl = ROLE_IMAGES[player.role];
+
       if (player.role === ROLE.MAFIA) {
-        msg += `🔴 MAFIYA\n\n`;
+        caption += `🔴 MAFIYA\n\n`;
         const others = game.aliveMafia().filter(p => p.id !== player.id);
-        msg += others.length > 0
+        caption += others.length > 0
           ? `👥 Jamoadoshlar:\n${others.map(p => `• ${p.name}`).join("\n")}\n\n`
           : `⚠️ Siz yagona mafiasiz!\n\n`;
-        msg += `📌 Tunda qurbon tanlaysiz.`;
+        caption += `📌 Tunda qurbon tanlaysiz.`;
       } else if (player.role === ROLE.DOCTOR) {
-        msg += `💚 DOKTOR\n\n📌 Tunda bitta odamni davolaysiz.\nOzingizni ham davolay olasiz!`;
+        caption += `💚 DOKTOR\n\n📌 Tunda bitta odamni davolaysiz.\nOzingizni ham davolay olasiz!`;
       } else if (player.role === ROLE.DETECTIVE) {
-        msg += `🔵 DETEKTIV\n\n📌 Tunda bitta odamning rolini bilib olasiz.`;
+        caption += `🔵 DETEKTIV\n\n📌 Tunda bitta odamning rolini bilib olasiz.`;
       } else {
-        msg += `⚪ XALQ\n\n📌 Kunduz ovoz berish orqali mafiyani toping!`;
+        caption += `⚪ XALQ\n\n📌 Kunduz ovoz berish orqali mafiyani toping!`;
       }
-      await this.sendToPlayer(player, msg);
+
+      await this.sendPhotoToPlayer(player, photoUrl, caption);
     }
 
     await this.startNight(game);
@@ -279,9 +292,7 @@ class GameManager {
 
     for (const mafia of mafias) {
       await this.sendToPlayer(mafia,
-        `🔴 MAFIYA NAVBATI\n` +
-        `━━━━━━━━━━━━━━━\n` +
-        `Kimni olib tashlaysiz?`,
+        `🔴 MAFIYA NAVBATI\n━━━━━━━━━━━━━━━\nKimni olib tashlaysiz?`,
         { reply_markup: keyboard }
       );
     }
@@ -297,8 +308,7 @@ class GameManager {
     const voter = game.getPlayer(ctx.from.id);
     if (!voter || voter.role !== ROLE.MAFIA || !voter.alive) return;
     if (game.mafiaVoted.has(ctx.from.id)) {
-      await ctx.answerCallbackQuery("Allaqachon tanladingiz!");
-      return;
+      await ctx.answerCallbackQuery("Allaqachon tanladingiz!"); return;
     }
 
     game.mafiaVoted.add(ctx.from.id);
@@ -341,9 +351,7 @@ class GameManager {
 
     for (const doctor of doctors) {
       await this.sendToPlayer(doctor,
-        `💚 DOKTOR NAVBATI\n` +
-        `━━━━━━━━━━━━━━━\n` +
-        `Kimni davolaysiz?`,
+        `💚 DOKTOR NAVBATI\n━━━━━━━━━━━━━━━\nKimni davolaysiz?`,
         { reply_markup: keyboard }
       );
     }
@@ -382,9 +390,7 @@ class GameManager {
 
     for (const detective of detectives) {
       await this.sendToPlayer(detective,
-        `🔵 DETEKTIV NAVBATI\n` +
-        `━━━━━━━━━━━━━━━\n` +
-        `Kimni tekshirasiz?`,
+        `🔵 DETEKTIV NAVBATI\n━━━━━━━━━━━━━━━\nKimni tekshirasiz?`,
         { reply_markup: keyboard }
       );
     }
@@ -459,10 +465,7 @@ class GameManager {
     });
 
     await this.sendToAllAlive(game,
-      `🗳️ OVOZ BERISH\n` +
-      `━━━━━━━━━━━━━━━\n` +
-      `Kimni oyindan chiqarasiz?\n` +
-      `(Tugmalardan tanlang)`,
+      `🗳️ OVOZ BERISH\n━━━━━━━━━━━━━━━\nKimni oyindan chiqarasiz?\n(Tugmalardan tanlang)`,
       { reply_markup: keyboard }
     );
   }
@@ -586,11 +589,103 @@ class GameManager {
     for (const p of game.players.values()) {
       msg += `${p.alive ? "✅" : "💀"} ${p.name} — ${ROLE_EMOJI[p.role]}\n`;
     }
-    msg += `━━━━━━━━━━━━━━━\nQayta oynash: /newgame`;
+    msg += `━━━━━━━━━━━━━━━`;
 
-    await this.sendToAll(game, msg);
-    for (const pid of game.players.keys()) this.playerGame.delete(pid);
-    this.games.delete(game.gameId);
+    // Oyinchilarni saqlab qolamiz rematch uchun
+    game.rematchPlayers = new Map(game.players);
+
+    const rematchKeyboard = new InlineKeyboard()
+      .text("🔄 Shu oyinchilar bilan qayta oyna", `rematch_${game.gameId}`);
+
+    for (const p of game.players.values()) {
+      try {
+        if (p.id === game.hostId) {
+          await this.bot.api.sendMessage(p.chatId,
+            msg + "\n\nQayta oynashni xohlaysizmi?",
+            { reply_markup: rematchKeyboard }
+          );
+        } else {
+          await this.bot.api.sendMessage(p.chatId, msg);
+        }
+      } catch (e) {}
+    }
+  }
+
+  async handleRematch(ctx, data) {
+    const oldGameId = data.replace("rematch_", "");
+    const oldGame = this.games.get(oldGameId);
+
+    if (!oldGame) { await ctx.reply("❌ Oyin topilmadi."); return; }
+    if (ctx.from.id !== oldGame.hostId) {
+      await ctx.answerCallbackQuery("Faqat host qayta boshlaydi!"); return;
+    }
+
+    await ctx.answerCallbackQuery("Yangi oyin yaratilmoqda...");
+
+    const newGameId = this.generateGameId();
+    const newGame = new Game(newGameId, oldGame.hostId, oldGame.hostName, oldGame.chatId);
+
+    // Eski sozlamalar
+    newGame.mafiaCount = oldGame.mafiaCount;
+    newGame.doctorCount = oldGame.doctorCount;
+    newGame.detectiveCount = oldGame.detectiveCount;
+    newGame.state = STATE.SETUP;
+
+    // Eski oyinchilarni qoshish
+    for (const p of oldGame.rematchPlayers.values()) {
+      newGame.addPlayer(p.id, p.name, p.chatId);
+      this.playerGame.set(p.id, newGameId);
+    }
+
+    this.games.set(newGameId, newGame);
+    this.games.delete(oldGameId);
+
+    const playerList = [...newGame.players.values()]
+      .map((p, i) => `${i + 1}. ${p.name}`)
+      .join("\n");
+
+    const setupKeyboard = new InlineKeyboard()
+      .text("🔴 Mafiya: " + newGame.mafiaCount, `setup_mafia_${newGame.gameId}`)
+      .text("💚 Doktor: " + newGame.doctorCount, `setup_doctor_${newGame.gameId}`)
+      .row()
+      .text("🔵 Detektiv: " + newGame.detectiveCount, `setup_detective_${newGame.gameId}`)
+      .row()
+      .text("🚀 OYINNI BOSHLASH", `start_game_${newGame.gameId}`);
+
+    const setupText =
+      `🔄 QAYTA OYIN\n` +
+      `━━━━━━━━━━━━━━━\n` +
+      `🆔 Yangi kod: ${newGameId}\n\n` +
+      `👥 Oyinchilar (${newGame.players.size}):\n` +
+      playerList +
+      `\n\n⚙️ Rollar:\n` +
+      `🔴 Mafiya: ${newGame.mafiaCount}\n` +
+      `💚 Doktor: ${newGame.doctorCount}\n` +
+      `🔵 Detektiv: ${newGame.detectiveCount}\n` +
+      `━━━━━━━━━━━━━━━\n` +
+      `Host "BOSHLASH" ni bossin!`;
+
+    // Hostga tugmali menyu
+    const hostPlayer = newGame.getPlayer(oldGame.hostId);
+    if (hostPlayer) {
+      try {
+        const sentMsg = await this.bot.api.sendMessage(
+          hostPlayer.chatId, setupText, { reply_markup: setupKeyboard }
+        );
+        newGame.setupMessageId = sentMsg.message_id;
+      } catch (e) {}
+    }
+
+    // Boshqa oyinchilarga xabar
+    for (const p of newGame.players.values()) {
+      if (p.id !== oldGame.hostId) {
+        try {
+          await this.bot.api.sendMessage(p.chatId,
+            `🔄 QAYTA OYIN!\n━━━━━━━━━━━━━━━\nHost oyinni sozlamoqda...\nBoshlashini kuting!`
+          );
+        } catch (e) {}
+      }
+    }
   }
 
   async showStatus(ctx) {

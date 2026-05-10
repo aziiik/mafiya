@@ -2,7 +2,7 @@ const { Bot, InlineKeyboard, GrammyError, HttpError } = require("grammy");
 const GameManager = require("./gameManager");
 const AdminManager = require("./adminManager");
 
-const BOT_TOKEN = "8743710419:AAEk3cgrKl0RtAzOzIAYlHo9l97jYAeq--w";
+const BOT_TOKEN = "8724276114:AAEEk6WlEtY91WJ-aaRaJlAGCFr8pAMrDEM";
 const OWNER_ID = 8378615092;
 
 const bot = new Bot(BOT_TOKEN);

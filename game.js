@@ -24,6 +24,14 @@ const ROLE_EMOJI = {
   citizen: "⚪ Xalq",
 };
 
+// Rol rasmlari - URL dan yuboriladi
+const ROLE_IMAGES = {
+  mafia: "https://i.imgur.com/8mGQmDw.jpeg",
+  doctor: "https://i.imgur.com/4QwLBJz.jpeg",
+  detective: "https://i.imgur.com/7KpXqZL.jpeg",
+  citizen: "https://i.imgur.com/3nQwRmK.jpeg",
+};
+
 class Game {
   constructor(gameId, hostId, hostName, chatId) {
     this.gameId = gameId;
@@ -67,9 +75,12 @@ class Game {
 
   assignRoles() {
     const list = [...this.players.values()];
-    for (let i = list.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [list[i], list[j]] = [list[j], list[i]];
+    // Fisher-Yates shuffle - 3 marta aralashtirish
+    for (let round = 0; round < 3; round++) {
+      for (let i = list.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [list[i], list[j]] = [list[j], list[i]];
+      }
     }
     let idx = 0;
     for (let i = 0; i < this.mafiaCount; i++) list[idx++].role = ROLE.MAFIA;
@@ -124,4 +135,4 @@ class Game {
   }
 }
 
-module.exports = { Game, STATE, ROLE, ROLE_EMOJI };
+module.exports = { Game, STATE, ROLE, ROLE_EMOJI, ROLE_IMAGES };
